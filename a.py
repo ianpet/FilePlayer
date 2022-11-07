@@ -236,7 +236,8 @@ def handlePlaylist(tokens):
     file.writelines(L)
     file.close()
     print("Press q during playback to quit, < and > to change file...")
-    log = runCommand('mpv --playlist=playlist.txt').stdout
+    retval = runCommand('mpv --playlist=playlist.txt')
+    log = retval.stdout
     os.remove("playlist.txt")
     lastOut = ""
      
@@ -436,6 +437,7 @@ def handlePlayDir(tokens):
 def handleInspect(tokens):
     global lastOut
     global inDir
+    global dirNumber
     if len(tokens) < 2:
         lastOut = "Specify a directory. Use 'dir' for a list of directories."
         return
@@ -452,7 +454,7 @@ def handleInspect(tokens):
     inDir = True
     makeIndex()
     dirNumber = choice - 1
-    lastOut = "Inspecting directory '" + directories[choice - 1] + "'"
+    lastOut = ""
 
 def handleBack(tokens):
     global lastOut
@@ -562,6 +564,8 @@ def handleUnwatched(tokens):
 
 def printScreen():
     os.system("cls")
+    if inDir:
+        print(f"Directory {directories[dirNumber]}: \n")
     print("Files:")
     printIndex()
     print()

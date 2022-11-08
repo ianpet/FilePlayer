@@ -3,12 +3,9 @@ import sys
 import subprocess
 from subprocess import Popen
 import json
-import threading
-import time
 import multiprocessing
-import ctypes
 
-debug = False
+
 numOpts = 0
 options = []
 directories = []
@@ -56,7 +53,7 @@ def makeIndex(switch=False):
     oldOptions = options.copy()
     options = []
     for line in output:
-        if line[-5:-1] in [".mkv", ".mp4"]:
+        if line[-5:-1] in {".mkv", ".mp4"}:
             name = line[39:-1]
             options.append(name)
     stream.close()
@@ -107,7 +104,7 @@ def runCommandOnce(command):
 def outDirList():
     toBeShown = "Directories:\n"
     for (i, dirName) in enumerate(directories):
-        buffer = " " if i + 1 < 10 else ""
+        buffer = "   " if i + 1 < 10 else "  "
         entry = f"{buffer}{i+1}: {dirName}\n"
         toBeShown += entry
     return toBeShown[:-1]
@@ -330,7 +327,6 @@ def handleDir(tokens):
                 directories.append(entry.name)
     toBeShown = outDirList()
     lastOut = toBeShown
-    debug = True
     
 def handleMoveDir(tokens):
     global lastOut
@@ -358,6 +354,7 @@ def handleMoveDir(tokens):
             
         command = "move \"" + options[fileNum - 1] + "\" \"" + directories[dirNum - 1] + "\""
         result = runCommand(command)
+        result.wait()
         if result.returncode != 0:
             lastOut = "Error, oops!"
         else:
@@ -388,6 +385,7 @@ def handleMoveDir(tokens):
         for i in range(fileNum1, fileNum2 + 1):
             command = "move \"" + options[i - 1] + "\" \"" + directories[dirNum - 1] + "\""
             result = runCommand(command)
+            result.wait()
             if result.returncode != 0:
                 lastOut = "encountered an error, quitting"
                 completed = False
@@ -429,6 +427,7 @@ def handlemkDir(tokens):
         for i in range(start, end + 1):
             command = "move \"" + options[i - 1] + "\" \"" + name + "\""
             result = runCommand(command)
+            result.wait()
             if result.returncode != 0:
                 lastOut = "Encountered an error, quitting"
                 completed = False
@@ -441,7 +440,6 @@ def handlemkDir(tokens):
 def handlePlayDir(tokens):
     global lastOut
     global log
-    global debug
     global inDir
     
     if inDir:
@@ -497,8 +495,8 @@ def handleBack(tokens):
     if not inDir:
         return
     os.chdir("..")
-    makeIndex()
     inDir = False
+    makeIndex(True)
     lastOut = outDirList()
 
 def handleDirectories(tokens):
@@ -625,20 +623,16 @@ handlers = {"quit":handleQuit,
             "inspect":handleInspect,
             "back":handleBack,
             "mkdir":handlemkDir,
-            "directories":handleDirectories,
+            "directories":handleDirectories, # debug
             "movedir":handleMoveDir,
             "sub":handleSub,
             "watched":handleWatched,
             "unwatched":handleUnwatched}
 
 def mainLoop():
-    global debug
     global dirty
     while True:
         printScreen()
-        if debug:
-            print(directories)
-            debug = False
         if dirty:
             with open(f'{".." if inDir else "."}\m\watched.json', 'w') as file:
                 json.dump(list(watched), file)

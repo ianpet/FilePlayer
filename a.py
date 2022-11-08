@@ -97,15 +97,10 @@ def getInput():
     return tokens
     
 def runCommand(command):
-    # with Popen(command, stdout=subprocess.PIPE, errors="ignore") as process:
-        # for line in process.stdout:
-            # print(line)
-    # process = Popen(command, stdout=subprocess.PIPE, errors="ignore")
-    # for line in process.stdout:
-        # print(line)
-        
     return subprocess.Popen(command, stdout=subprocess.PIPE, errors="ignore", shell=True)
-            
+
+# TODO: merge these functionalities properly    
+    
 def runCommandOnce(command):
     Popen(command, stdout=subprocess.PIPE, errors="ignore")
 
@@ -123,32 +118,19 @@ def inquirePlaying(finishPlaying, sender, inDir):
     socket = "\\\\.\\pipe\\mpvsocket"
     message = '{ "command": [\\"get_property\\", \\"path\\"] }'
     command = f'powershell "{pathToSocat}" {socket} \'{message}\''
-    # print(command)
-    runCount = 0
     while not finishPlaying.is_set():
-        runCount += 1
-        # print("running")
         proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-        # print("started, and ")
         try:
             proc.wait(5)
         except subprocess.TimeoutExpired:
             sender.send(playingFile)
             return
-        # print("waited for finish")
         if proc.returncode == 0:
-            # print("in if")
             outs = proc.stdout.read()
             playingFile = json.loads(outs.decode("utf-8"))["data"]
-            # print("Playing file: " + playingFile)
-            # print("saved filename")
         else:
             print(proc.stdout.read().decode("utf-8"))
-        # print("waiting for loop")
         finishPlaying.wait(10)
-        # print("waited for loop, looping!!")
-    
-    # print(runCount)
     sender.send(playingFile)
 
 
@@ -242,15 +224,11 @@ def handleInvalid(tokens):
 def handleConfig(tokens):
     global lastOut
     appdata = os.getenv('APPDATA')
-    # os.system("notepad++ %APPDATA%\mpv\mpv.conf")
-    # doesn't work, env. variable invalid: 
-    # runCommand("notepad++ %APPDATA%\mpv\mpv.conf")
-    runCommandOnce("notepad++ " + appdata + "\\mpv\\mpv.conf")
+    runCommandOnce(f"notepad++ {appdata}\\mpv\\mpv.conf")
     lastOut = "Config file opened"
     
 def handleCode(tokens):
     global lastOut
-    # os.system("notepad++ m\\a.py")
     runCommandOnce("notepad++ \"C:\\Users\\Ianpe\\documents\\books\\fun books\\other\\m\\a.py")
     lastOut = "Code file opened"
 
@@ -294,12 +272,10 @@ def handlePlaylist(tokens):
     retval.wait()
     log = retval.stdout.read()
     
-    # print("finished command, setting")
     finishPlaying.set()
     filePlaying = receiver.recv()
     receiver.close()
     
-    # print(f"file value: {filePlaying}")
     lastOut = ""
     if filePlaying != "":
         for played in options[start-1:end]:
@@ -308,7 +284,6 @@ def handlePlaylist(tokens):
                 break
     dirty = True
     os.remove("playlist.txt")
-    # input()
     
     
      
@@ -346,9 +321,8 @@ def handleMove(tokens):
 def handleDir(tokens):
     global lastOut
     global directories
-    # global debug
     directories = []  
-    # dirs = os.listdir()
+    
     num = 1
     if not inDir:
         for entry in os.scandir():
@@ -383,7 +357,6 @@ def handleMoveDir(tokens):
             return
             
         command = "move \"" + options[fileNum - 1] + "\" \"" + directories[dirNum - 1] + "\""
-        # lastOut = command
         result = runCommand(command)
         if result.returncode != 0:
             lastOut = "Error, oops!"
@@ -425,7 +398,7 @@ def handleMoveDir(tokens):
             
 def handlemkDir(tokens):
     global lastOut
-    # no args
+    
     if inDir:
         lastOut = "Operation not supported in inspect mode"
         return
@@ -470,7 +443,6 @@ def handlePlayDir(tokens):
     global log
     global debug
     global inDir
-    # debug = True
     
     if inDir:
         lastOut = "Please use 'back' first, until functionality is added"
@@ -495,28 +467,6 @@ def handlePlayDir(tokens):
     os.chdir("..")
     inDir = False
     makeIndex(True)
-    # saved = options.copy()
-    # print("before remake watched: ")
-    # print([s for s in filter(lambda entry: entry in watched, [entry for entry in saved])])
-    # print("after remake watched: ")
-    # print([s for s in filter(lambda entry: entry in watched, [entry for entry in saved])])
-    # print("---")
-    # input()
-    # file = open("playlist.txt", "w")
-    # L = [(s.name + "\n") for s in os.scandir()]
-    # file.writelines(L)
-    # file.close()
-    # print("Press q during playback to quit, < and > to change file...")
-    # stream = subprocess.Popen('mpv --playlist=playlist.txt', stdout=subprocess.PIPE, encoding="cp850", errors="ignore")
-    # maybe get this to work some day? not sure what the problem is
-    # stream = os.popen('mpv --playlist=playlist.txt')
-    # log = runCommand('mpv --playlist=playlist.txt').stdout
-    # lastOut = ""
-    # try: 
-        # log = stream.read()
-    # except UnicodeDecodeError: 
-        # lastOut = "Error in reading log"
-    # os.remove("playlist.txt")
     return
     
 def handleInspect(tokens):

@@ -48,7 +48,7 @@ code                                Opens the python file
 quit                                Quits program
 help                                Print this help message"""
 
-def makeIndex():
+def makeIndex(switch=False):
     global dirty
     stream = os.popen('dir\n')
     output = stream.readlines()
@@ -60,7 +60,7 @@ def makeIndex():
             name = line[39:-1]
             options.append(name)
     stream.close()
-    if not inDir:
+    if not (inDir or switch):
         for title in (x for x in oldOptions if x not in options):
             watched.discard(title)
             dirty = True
@@ -119,19 +119,28 @@ def outDirList():
 
 def inquirePlaying(finishPlaying, sender, inDir):
     playingFile = ""
-    command = f'powershell {".." if inDir else "."}\\m\\socat.ps1 \\\\.\\pipe\\mpvsocket \'{{ "command": [\\"get_property\\", \\"path\\"] }}\''
+    pathToSocat = "C:\\Users\\ianpe\\Documents\\Books\\Fun` Books\\Other\\m\\socat.ps1"
+    socket = "\\\\.\\pipe\\mpvsocket"
+    message = '{ "command": [\\"get_property\\", \\"path\\"] }'
+    command = f'powershell "{pathToSocat}" {socket} \'{message}\''
+    # print(command)
     runCount = 0
     while not finishPlaying.is_set():
         runCount += 1
         # print("running")
         proc = subprocess.Popen(command, stdout=subprocess.PIPE)
         # print("started, and ")
-        proc.wait(5)
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            sender.send(playingFile)
+            return
         # print("waited for finish")
         if proc.returncode == 0:
             # print("in if")
             outs = proc.stdout.read()
             playingFile = json.loads(outs.decode("utf-8"))["data"]
+            # print("Playing file: " + playingFile)
             # print("saved filename")
         else:
             print(proc.stdout.read().decode("utf-8"))
@@ -460,7 +469,9 @@ def handlePlayDir(tokens):
     global lastOut
     global log
     global debug
+    global inDir
     # debug = True
+    
     if inDir:
         lastOut = "Please use 'back' first, until functionality is added"
         return
@@ -478,23 +489,35 @@ def handlePlayDir(tokens):
         lastOut = "Invalid directory, somehow. Use 'dir' to update directories"
         return
         
-    
-    file = open("playlist.txt", "w")
-    L = [(s.name + "\n") for s in os.scandir()]
-    file.writelines(L)
-    file.close()
-    print("Press q during playback to quit, < and > to change file...")
+    inDir = True
+    makeIndex()
+    handlePlaylist((None, 1, len(options)))
+    os.chdir("..")
+    inDir = False
+    makeIndex(True)
+    # saved = options.copy()
+    # print("before remake watched: ")
+    # print([s for s in filter(lambda entry: entry in watched, [entry for entry in saved])])
+    # print("after remake watched: ")
+    # print([s for s in filter(lambda entry: entry in watched, [entry for entry in saved])])
+    # print("---")
+    # input()
+    # file = open("playlist.txt", "w")
+    # L = [(s.name + "\n") for s in os.scandir()]
+    # file.writelines(L)
+    # file.close()
+    # print("Press q during playback to quit, < and > to change file...")
     # stream = subprocess.Popen('mpv --playlist=playlist.txt', stdout=subprocess.PIPE, encoding="cp850", errors="ignore")
     # maybe get this to work some day? not sure what the problem is
     # stream = os.popen('mpv --playlist=playlist.txt')
-    log = runCommand('mpv --playlist=playlist.txt').stdout
-    lastOut = ""
+    # log = runCommand('mpv --playlist=playlist.txt').stdout
+    # lastOut = ""
     # try: 
         # log = stream.read()
     # except UnicodeDecodeError: 
         # lastOut = "Error in reading log"
-    os.remove("playlist.txt")
-    os.chdir("..")
+    # os.remove("playlist.txt")
+    return
     
 def handleInspect(tokens):
     global lastOut
@@ -627,8 +650,9 @@ def handleUnwatched(tokens):
 def printScreen():
     os.system("cls")
     if inDir:
-        print(f"Directory {directories[dirNumber]}: \n")
-    print("Files:")
+        print(f"Files in \"{directories[dirNumber]}\":\n")
+    else:
+        print("Files:")
     printIndex()
     print()
     print(lastOut)

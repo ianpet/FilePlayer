@@ -3,6 +3,10 @@ import sys
 import subprocess
 from subprocess import Popen
 import json
+import threading
+import time
+import multiprocessing
+import ctypes
 
 debug = False
 numOpts = 0
@@ -16,6 +20,7 @@ prompt = ">"
 lastOut = ""
 watched = set()
 dirty = False
+
 
 helpMessage = """Commands:
 play [number]                       Play file [number]
@@ -99,7 +104,7 @@ def runCommand(command):
     # for line in process.stdout:
         # print(line)
         
-    return subprocess.run(command, stdout=subprocess.PIPE, errors="ignore", shell=True)
+    return subprocess.Popen(command, stdout=subprocess.PIPE, errors="ignore", shell=True)
             
 def runCommandOnce(command):
     Popen(command, stdout=subprocess.PIPE, errors="ignore")
@@ -111,6 +116,33 @@ def outDirList():
         entry = f"{buffer}{i+1}: {dirName}\n"
         toBeShown += entry
     return toBeShown[:-1]
+
+def inquirePlaying(finishPlaying, sender, inDir):
+    playingFile = ""
+    command = f'powershell {".." if inDir else "."}\\m\\socat.ps1 \\\\.\\pipe\\mpvsocket \'{{ "command": [\\"get_property\\", \\"path\\"] }}\''
+    runCount = 0
+    while not finishPlaying.is_set():
+        runCount += 1
+        # print("running")
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+        # print("started, and ")
+        proc.wait(5)
+        # print("waited for finish")
+        if proc.returncode == 0:
+            # print("in if")
+            outs = proc.stdout.read()
+            playingFile = json.loads(outs.decode("utf-8"))["data"]
+            # print("saved filename")
+        else:
+            print(proc.stdout.read().decode("utf-8"))
+        # print("waiting for loop")
+        finishPlaying.wait(10)
+        # print("waited for loop, looping!!")
+    
+    # print(runCount)
+    sender.send(playingFile)
+
+
 
 def handleQuit(tokens):
     print('Goodbye!')
@@ -132,6 +164,7 @@ def handleLog(tokens):
 def handlePlay(tokens):
     global lastOut
     global log
+    global dirty
     invalidChoice = "Please enter a number from 1 to " + str(len(options))
     if len(tokens) == 1:
         lastOut = invalidChoice
@@ -147,8 +180,10 @@ def handlePlay(tokens):
         return
     print("Press q during playback to quit...")
     title = options[choice - 1]
-    
-    log = runCommand(f'mpv "{title}"').stdout
+   
+    proc = runCommand(f'mpv "{title}"')
+    proc.wait()
+    log = proc.stdout
     if title not in watched:
         watched.add(options[choice - 1])
         dirty = True
@@ -213,6 +248,9 @@ def handleCode(tokens):
 def handlePlaylist(tokens):
     global lastOut
     global log
+    global filePlaying
+    global dirty
+    
     invalidChoice = "Please enter numbers from 1 to " + str(len(options))
     if len(tokens) < 3:
         lastOut = "Please enter the start and end of the playlist"
@@ -236,10 +274,34 @@ def handlePlaylist(tokens):
     file.writelines(L)
     file.close()
     print("Press q during playback to quit, < and > to change file...")
-    retval = runCommand('mpv --playlist=playlist.txt')
-    log = retval.stdout
-    os.remove("playlist.txt")
+    
+    # hell    
+    finishPlaying = multiprocessing.Event()
+    sender, receiver = multiprocessing.Pipe()
+    inquireProcess = multiprocessing.Process(target=inquirePlaying, args=(finishPlaying, sender, inDir))
+    inquireProcess.start()
+    
+    retval = runCommand('mpv --playlist=playlist.txt --input-ipc-server=.\\pipe\\mpvsocket')
+    retval.wait()
+    log = retval.stdout.read()
+    
+    # print("finished command, setting")
+    finishPlaying.set()
+    filePlaying = receiver.recv()
+    receiver.close()
+    
+    # print(f"file value: {filePlaying}")
     lastOut = ""
+    if filePlaying != "":
+        for played in options[start-1:end]:
+            watched.add(played)
+            if played == filePlaying:
+                break
+    dirty = True
+    os.remove("playlist.txt")
+    # input()
+    
+    
      
 def handleClear(tokens):
     global lastOut
@@ -597,14 +659,16 @@ handlers = {"quit":handleQuit,
 
 def mainLoop():
     global debug
+    global dirty
     while True:
         printScreen()
         if debug:
             print(directories)
             debug = False
-        if dirty and not inDir:
-            with open("m\watched.json", 'w') as file:
+        if dirty:
+            with open(f'{".." if inDir else "."}\m\watched.json', 'w') as file:
                 json.dump(list(watched), file)
+            dirty = False
         tokens = getInput()
         if (len(tokens) == 0):
             continue

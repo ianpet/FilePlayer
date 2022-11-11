@@ -37,6 +37,7 @@ watched [number]                    Mark [number] as watched
 watched [start] [end]               Mark [start] through [end] as watched
 unwatched [number]                  Mark [number] as unwatched
 unwatched [start] [end]             Mark [start] through [end] as unwatched
+moved [number]                      Mark [number] as having moved directories
 config                              Open the mpv config file
 log                                 Print the log of the last play
 refresh                             Refresh the index

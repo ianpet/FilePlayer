@@ -313,10 +313,9 @@ def handleMove(tokens):
 def handleDir(tokens):
     global lastOut
     global directories
-    directories = []  
-    
     num = 1
     if not inDir:
+        directories = []  
         for entry in os.scandir():
             if entry.is_dir() and entry.name != "m":
                 directories.append(entry.name)
@@ -392,9 +391,13 @@ def handlemkDir(tokens):
         print("Making a new directory from files " + str(start) + " to " + str(end))
         name = input("Name for new directory: ")
         os.system(f'mkdir "{name}"')
+        watchedFiles = set()
         completed = True
         for i in range(start, end + 1):
-            command = f'move "{options[i - 1]}" "{name}"'
+            fileName = options[i-1]
+            if fileName in watched:
+                watchedFiles.add(fileName)
+            command = f'move "{fileName}" "{name}"'
             result = runCommand(command)
             result.wait()
             if result.returncode != 0:
@@ -404,6 +407,7 @@ def handlemkDir(tokens):
         if completed:
             lastOut = f'Directory "{name}" created'
     makeIndex()
+    watched.update(watchedFiles)
     handleDir(tokens)
             
 def handlePlayDir(tokens):
@@ -448,7 +452,7 @@ def handleInspect(tokens):
         lastOut = f'Please enter a directory number, 1 to {len(directories)}'
         return
     try:
-        os.chdir(directories[choice - 1])
+        os.chdir(f'{".." if inDir else "."}\{directories[choice - 1]}')
     except:
         lastOut = "Invalid directory, somehow. Use 'dir' to update directories."
         return
@@ -545,11 +549,24 @@ def handleUnwatched(tokens):
         lastOut = f"Unwatched {choiceB - choiceA + 1} files"
     dirty = True
    
+def handleMoved(tokens):
+    global lastOut
+    if len(tokens) < 2:
+        lastOut = "Please specify a moved file"
+        return
+    movedFile = verifyFileNumber(tokens[1])
+    if movedFile is None:
+        lastOut = f'Please select a file number from 1 to {len(options)}'
+        return
+    options.pop(movedFile - 1)
+    
+    
 
 def printScreen():
     os.system("cls")
     if inDir:
-        print(f"Files in \"{directories[dirNumber]}\":\n")
+        fileStatement = f"Files in \"{directories[dirNumber]}\":"
+        print(fileStatement)
     else:
         print("Files:")
     printIndex()
@@ -578,7 +595,9 @@ handlers = {"quit":handleQuit,
             "movedir":handleMoveDir,
             "sub":handleSub,
             "watched":handleWatched,
-            "unwatched":handleUnwatched}
+            "unwatched":handleUnwatched,
+            "moved":handleMoved
+            }
 
 def mainLoop():
     global dirty

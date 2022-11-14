@@ -189,7 +189,7 @@ def handlePlay(tokens):
    
     proc = runCommand(f'mpv "{title}"')
     proc.wait()
-    log = proc.stdout.read()
+    log = f"Playing file: {options[choice - 1]}\n{proc.stdout.read()}"
     if title not in watched:
         watched.add(options[choice - 1])
         dirty = True

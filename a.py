@@ -125,7 +125,12 @@ def inquirePlaying(finishPlaying, sender, inDir):
             return
         if proc.returncode == 0:
             outs = proc.stdout.read()
-            playingFile = json.loads(outs.decode("utf-8"))["data"]
+            try:
+                playingFile = json.loads(outs.decode("utf-8"))["data"]
+            except KeyError:
+                print("Error in decoding JSON response:")
+                print(outs)
+                sender.send(playingFile)
         else:
             print(proc.stdout.read().decode("utf-8"))
         finishPlaying.wait(10)
@@ -275,7 +280,7 @@ def handlePlaylist(tokens):
     finishPlaying.set()
     filePlaying = receiver.recv()
     receiver.close()
-    
+    log += f"\nLast played file: {filePlaying}"
     lastOut = ""
     if filePlaying != "":
         for played in options[start-1:end]:

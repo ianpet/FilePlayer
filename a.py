@@ -1,23 +1,21 @@
 import os
-import sys
 import subprocess
-from subprocess import Popen
 import json
 import multiprocessing
+from typing import Callable, Optional
 
 
 numOpts = 0
-options = []
-directories = []
+options: list[str] = []
+directories: list[str] = []
 inDir = False
 dirNumber = 0
 log = "No file played"
 invalidCommand = "Please entire a valid command. Use 'help' for a list of commands"
 prompt = ">"
 lastOut = ""
-watched = set()
+watched: set[str] = set()
 dirty = False
-
 
 helpMessage = """Commands:
 play [number]                       Play file [number]
@@ -45,6 +43,8 @@ clear                               Clears output
 code                                Opens the python file
 quit                                Quits program
 help                                Print this help message"""
+
+# General use functions
 
 def makeIndex(switch=False):
     global dirty
@@ -78,7 +78,7 @@ def init():
     os.system("cls")
     os.system("mode con: cols=120 lines=60")
     makeIndex()
-    handleDir([])
+    handleDir()
     try:
         with open("m/watched.json", 'r') as file:
             try:
@@ -100,7 +100,7 @@ def runCommand(command):
 # TODO: merge these functionalities properly    
     
 def runCommandOnce(command):
-    Popen(command, stdout=subprocess.PIPE, errors="ignore")
+    subprocess.Popen(command, stdout=subprocess.PIPE, errors="ignore")
 
 def outDirList():
     toBeShown = "Directories:\n"
@@ -110,7 +110,7 @@ def outDirList():
         toBeShown += entry
     return toBeShown[:-1]
 
-def inquirePlaying(finishPlaying, sender, inDir):
+def inquirePlaying(finishPlaying, sender):
     playingFile = ""
     pathToSocat = "C:\\Users\\ianpe\\Documents\\Books\\Fun` Books\\Other\\m\\socat.ps1"
     socket = "\\\\.\\pipe\\mpvsocket"
@@ -137,7 +137,7 @@ def inquirePlaying(finishPlaying, sender, inDir):
         finishPlaying.wait(10)
     sender.send(playingFile)
 
-def verifyFileNumber(numString):
+def verifyFileNumber(numString: str | int):
     try:
         num = int(numString)
     except ValueError:
@@ -146,7 +146,7 @@ def verifyFileNumber(numString):
         return None
     return num
 
-def verifyDirNumber(numString):
+def verifyDirNumber(numString: str | int):
     try:
         num = int(numString)
     except ValueError:
@@ -155,32 +155,34 @@ def verifyDirNumber(numString):
         return None
     return num
 
-def handleQuit(tokens):
+# Handler functions for each command
+
+def handleQuit(*tokens):
     print('Goodbye!')
     quit()
     
-def handleRefresh(tokens):
+def handleRefresh(*tokens):
     global lastOut
     os.system("mode con: cols=120 lines=60")
     makeIndex()
     
-def handleHelp(tokens):
+def handleHelp(*tokens):
     global lastOut
     lastOut = helpMessage
     
-def handleLog(tokens):
+def handleLog(*tokens):
     global lastOut
     lastOut = log
     
-def handlePlay(tokens):
+def handlePlay(fileNumStr: Optional[str] = None, *tokens):
     global lastOut
     global log
     global dirty
     invalidChoice = "Please enter a number from 1 to " + str(len(options))
-    if len(tokens) == 1:
+    if fileNumStr is None:
         lastOut = invalidChoice
         return
-    choice = verifyFileNumber(tokens[1])
+    choice = verifyFileNumber(fileNumStr)
     if choice is None:
         lastOut = invalidChoice
         return
@@ -197,20 +199,19 @@ def handlePlay(tokens):
         dirty = True
     lastOut = ""
     
-def handleDelete(tokens):
+def handleDelete(fileNumStr: Optional[str] = None, *tokens):
     global lastOut
     global dirty
     invalidChoice = "Please enter a number from 1 to " + str(len(options))
-    if len(tokens) == 1:
+    if fileNumStr is None:
         lastOut = invalidChoice
         return
-    choice = verifyFileNumber(tokens[1])
+    choice = verifyFileNumber(fileNumStr)
     if choice is None:
         lastOut = invalidChoice
         return
-        
-    print(f'Are you sure you want to delete {"unwatched" if options[choice - 1] not in watched else ""} "{options[choice-1]}"?\nY to confirm: ', end = "")
-    response = input()
+    prompt = f'Are you sure you want to delete {"unwatched" if options[choice - 1] not in watched else ""} "{options[choice-1]}"?\nY to confirm: '
+    response = input(prompt)
     if response.lower() != 'y':
         lastOut = "Deletion canceled"
         return
@@ -229,32 +230,32 @@ def handleDelete(tokens):
     lastOut = "File deleted"
     makeIndex()
         
-def handleInvalid(tokens):
+def handleInvalid(*tokens):
     global lastOut
     lastOut = invalidCommand
 
-def handleConfig(tokens):
+def handleConfig(*tokens):
     global lastOut
     appdata = os.getenv('APPDATA')
     runCommandOnce(f"notepad++ {appdata}\\mpv\\mpv.conf")
     lastOut = "Config file opened"
     
-def handleCode(tokens):
+def handleCode(*tokens):
     global lastOut
-    runCommandOnce("notepad++ \"C:\\Users\\Ianpe\\documents\\books\\fun books\\other\\m\\a.py")
+    runCommandOnce(f'notepad++ "{__file__}"')
     lastOut = "Code file opened"
 
-def handlePlaylist(tokens):
+def handlePlaylist(startFileStr: Optional[str | int] = None, endFilestr: Optional[str | int] = None, *tokens):
     global lastOut
     global log
     global filePlaying
     global dirty
     
     invalidChoice = "Please enter numbers from 1 to " + str(len(options))
-    if len(tokens) < 3:
+    if startFileStr is None or endFilestr is None:
         lastOut = "Please enter the start and end of the playlist"
         return
-    start, end = verifyFileNumber(tokens[1]), verifyFileNumber(tokens[2])
+    start, end = verifyFileNumber(startFileStr), verifyFileNumber(endFilestr)
     if start is None or end is None:
         lastOut = invalidChoice
         return
@@ -265,14 +266,13 @@ def handlePlaylist(tokens):
     L = [(s + "\n") for s in options[start-1:end]]
     with open("playlist.txt", "w") as file:
         file.writelines(L)
-    file.close()
 
     print("Press q during playback to quit, < and > to change file...")
     
     # hell    
     finishPlaying = multiprocessing.Event()
     sender, receiver = multiprocessing.Pipe()
-    inquireProcess = multiprocessing.Process(target=inquirePlaying, args=(finishPlaying, sender, inDir))
+    inquireProcess = multiprocessing.Process(target=inquirePlaying, args=(finishPlaying, sender))
     inquireProcess.start()
     
     mpvProcess = runCommand('mpv --playlist=playlist.txt --input-ipc-server=.\\pipe\\mpvsocket')
@@ -291,21 +291,19 @@ def handlePlaylist(tokens):
             if played == filePlaying:
                 break
     dirty = True
-    os.remove("playlist.txt")
-    
-    
+    os.remove("playlist.txt")  
      
-def handleClear(tokens):
+def handleClear(*tokens):
     global lastOut
     lastOut = ""
 
-def handleMove(tokens):
+def handleMove(startLocStr: Optional[str] = None, endLocStr: Optional[str] = None, *tokens):
     global lastOut
     invalidChoice = "Please enter numbers from 1 to " + str(len(options))
-    if len(tokens) < 3:
+    if startLocStr is None or endLocStr is None:
         lastOut = "Please enter the item and destination to move to"
         return
-    start, end = verifyFileNumber(tokens[1]), verifyFileNumber(tokens[2])
+    start, end = verifyFileNumber(startLocStr), verifyFileNumber(endLocStr)
     if start is None or end is None:
         lastOut = invalidChoice
         return
@@ -319,7 +317,7 @@ def handleMove(tokens):
         options.insert(end-1, options.pop(start-1))
     lastOut = ""
 
-def handleDir(tokens):
+def handleDir(*tokens):
     global lastOut
     global directories
     num = 1
@@ -331,16 +329,16 @@ def handleDir(tokens):
     toBeShown = outDirList()
     lastOut = toBeShown
     
-def handleMoveDir(tokens):
+def handleMoveDir(fileNumStr: Optional[str] = None, secondArg: Optional[str] = None, dirNumString: Optional[str] = None, *tokens):
     global lastOut
     if inDir:
         lastOut = "Moving files between directories is not supported"
         return
-    if len(tokens) < 3:
+    if fileNumStr is None or secondArg is None:
         lastOut = "Please enter a file and directory number"
         return
-    if len(tokens) < 4:
-        fileNum, dirNum = verifyFileNumber(tokens[1]), verifyDirNumber(tokens[2])
+    if dirNumString is None:
+        fileNum, dirNum = verifyFileNumber(fileNumStr), verifyDirNumber(secondArg)
         if fileNum is None:
             lastOut = f"Please select a file from 1 to {len(options)}"
             return
@@ -348,26 +346,26 @@ def handleMoveDir(tokens):
             lastOut = f"Please select a directory from 1 to {len(directories)}"
             return
             
-        command = "move \"" + options[fileNum - 1] + "\" \"" + directories[dirNum - 1] + "\""
+        command = f'move "{options[fileNum - 1]}" "{directories[dirNum - 1]}"'
         result = runCommand(command)
         result.wait()
         if result.returncode != 0:
             lastOut = "Error, oops!"
         else:
-            lastOut = "Moved " + options[fileNum - 1] + " to " + directories[dirNum - 1]
+            lastOut = f"Moved {options[fileNum - 1]} to {directories[dirNum - 1]}"
     else:
-        fileNum1, fileNum2, dirNum = verifyFileNumber(tokens[1]), verifyFileNumber(tokens[2]), verifyDirNumber(tokens[3])
-        if fileNum1 is None or fileNum2 is None:
+        startFileNum, endFileNum, dirNum = verifyFileNumber(fileNumStr), verifyFileNumber(secondArg), verifyDirNumber(dirNumString)
+        if startFileNum is None or endFileNum is None:
             lastOut = f"Please select a file from 1 to {len(options)}"
             return
         if dirNum is None:
             lastOut = f"Please select a directory from 1 to {len(directories)}"
             return
-        if fileNum2 < fileNum1:
-            fileNum1, fileNum2 = fileNum2, fileNum1
+        if endFileNum < startFileNum:
+            startFileNum, endFileNum = endFileNum, startFileNum
         completed = True
-        for i in range(fileNum1, fileNum2 + 1):
-            command = "move \"" + options[i - 1] + "\" \"" + directories[dirNum - 1] + "\""
+        for i in range(startFileNum, endFileNum + 1):
+            command = f'move "{options[i - 1]}" "{directories[dirNum - 1]}"'
             result = runCommand(command)
             result.wait()
             if result.returncode != 0:
@@ -375,30 +373,29 @@ def handleMoveDir(tokens):
                 completed = False
                 break
         if completed:
-            lastOut = "Moved " + str(fileNum2 - fileNum1 + 1) + " files to " + directories[dirNum - 1]
+            lastOut = f"Moved {str(endFileNum - startFileNum + 1)} files to {directories[dirNum - 1]}"
     makeIndex()
-            
-def handlemkDir(tokens):
+
+def handlemkDir(startLocStr: Optional[str] = None, endLocString: Optional[str] = None, *tokens):
     global lastOut
-    
     if inDir:
         lastOut = "Operation not supported in inspect mode"
         return
     watchedFiles = set()
-    if len(tokens) < 3:
+    if startLocStr is None or endLocString is None:
         print("Making a new empty directory")
         name = input("Name for new directory: ")
-        os.system("mkdir \"" + name + "\"")
-        lastOut = "Directory '" + name + "' created"
+        os.system(f'mkdir "{name}"')
+        lastOut = f'Directory "{name}" created'
     else:
         invalidChoice = "Please enter numbers from 1 to " + str(len(options))
-        start, end = verifyFileNumber(tokens[1]), verifyFileNumber(tokens[2])
+        start, end = verifyFileNumber(startLocStr), verifyFileNumber(endLocString)
         if start is None or end is None:
             lastOut = invalidChoice
             return
         if start > end:
             start, end = end, start
-        print("Making a new directory from files " + str(start) + " to " + str(end))
+        print(f'Making a new directory from files {start} to {end}')
         name = input("Name for new directory: ")
         os.system(f'mkdir "{name}"')
         completed = True
@@ -417,9 +414,9 @@ def handlemkDir(tokens):
             lastOut = f'Directory "{name}" created'
     makeIndex()
     watched.update(watchedFiles)
-    handleDir(tokens)
-            
-def handlePlayDir(tokens):
+    handleDir()
+
+def handlePlayDir(dirNumStr: Optional[str] = None, *tokens):
     global lastOut
     global log
     global inDir
@@ -427,11 +424,11 @@ def handlePlayDir(tokens):
     if inDir:
         lastOut = "Please use 'back' first, until functionality is added"
         return
-    if len(tokens) < 2:
+    if dirNumStr is None:
         lastOut = "Specify a directory. Use 'dir' for a list of directories"
         return
     
-    choice = verifyDirNumber(tokens[1])
+    choice = verifyDirNumber(dirNumStr)
     if choice is None:
         lastOut = f"Please select a directory from 1 to {len(directories)}"
         return
@@ -443,20 +440,20 @@ def handlePlayDir(tokens):
         
     inDir = True
     makeIndex()
-    handlePlaylist((None, 1, len(options)))
+    handlePlaylist(1, len(options))
     os.chdir("..")
     inDir = False
     makeIndex(True)
     return
     
-def handleInspect(tokens):
+def handleInspect(dirNumStr: Optional[str] = None, *tokens):
     global lastOut
     global inDir
     global dirNumber
-    if len(tokens) < 2:
+    if dirNumStr is None:
         lastOut = "Specify a directory. Use 'dir' for a list of directories."
         return
-    choice = verifyDirNumber(tokens[1])
+    choice = verifyDirNumber(dirNumStr)
     if choice is None:
         lastOut = f'Please enter a directory number, 1 to {len(directories)}'
         return
@@ -470,7 +467,7 @@ def handleInspect(tokens):
     dirNumber = choice - 1
     lastOut = ""
 
-def handleBack(tokens):
+def handleBack(*tokens):
     global lastOut
     global inDir
     if not inDir:
@@ -480,25 +477,25 @@ def handleBack(tokens):
     makeIndex(True)
     lastOut = outDirList()
 
-def handleDirectories(tokens):
+def handleDirectories(*tokens):
     global lastOut
     lastOut = str(directories)
 
-def handleSub(tokens):
+def handleSub(vidFileStr: Optional[str] = None, subFileStr: Optional[str] = None, *tokens):
     global lastOut
     global log
-    if len(tokens) < 3:
+    if vidFileStr is None or subFileStr is None:
         lastOut = "Please specify a video file and a subtitle file."
         return
     
-    vidfile, subfile = verifyFileNumber(tokens[1]), verifyFileNumber(tokens[2])
+    vidfile, subfile = verifyFileNumber(vidFileStr), verifyFileNumber(subFileStr)
     if vidfile is None or subfile is None:
         lastOut = f'Please enter file numbers, 1 to {len(options)}'
         return
-    newfilename = input("Name for new file: ")
-    with open("SubtitleOptions.json", 'r') as file:
+    newFileName = input("Name for new file: ")
+    with open(f'{".." if inDir else "."}\\m\\SubtitleOptions.json', 'r') as file:
         optionsString = file.read()
-    optionsString = optionsString.replace("XX", newfilename)
+    optionsString = optionsString.replace("XX", newFileName)
     optionsString = optionsString.replace("YY", options[vidfile-1])
     optionsString = optionsString.replace("ZZ", options[subfile-1])
     with open("DoingSubtitle.json", 'w') as file:
@@ -512,65 +509,72 @@ def handleSub(tokens):
     lastOut = "Made new file"
     makeIndex()
 
-def handleWatched(tokens):
+def handleWatched(firstFileStr: Optional[str] = None, lastFileStr: Optional[str] = None, *tokens):
     global lastOut
     global dirty
     invalidChoice = "Please enter a number from 1 to " + str(len(options))
-    if len(tokens) == 1:
+    if firstFileStr is None:
         lastOut = invalidChoice
         return
-    choiceA = verifyFileNumber(tokens[1])
-    choiceB = 0 if len(tokens) < 3 else verifyFileNumber(tokens[2])
-    if choiceA is None or choiceB is None:
+    firstChoice = verifyFileNumber(firstFileStr)
+    if firstChoice is None:
         lastOut = invalidChoice
         return
-    if choiceB == 0:
-        title = options[choiceA - 1]
+    if lastFileStr is None:
+        title = options[firstChoice - 1]
         watched.add(title)
         lastOut = f"Watched {title}"
     else:
-        if choiceA > choiceB:
-            choiceA, choiceB = choiceB, choiceA
-        for i in range(choiceA, choiceB + 1):
+        lastChoice = verifyFileNumber(lastFileStr)
+        if lastChoice is None:
+            lastOut = invalidChoice
+            return
+        if firstChoice > lastChoice:
+            firstChoice, lastChoice = lastChoice, firstChoice
+        for i in range(firstChoice, lastChoice + 1):
             watched.add(options[i - 1])
-        lastOut = f"Watched {choiceB - choiceA + 1} files"
+        lastOut = f"Watched {lastChoice - firstChoice + 1} files"
     dirty = True
-    
-def handleUnwatched(tokens):
+
+def handleUnwatched(firstFileStr: Optional[str] = None, lastFileStr: Optional[str] = None, *tokens):
     global lastOut
     global dirty
     invalidChoice = "Please enter a number from 1 to " + str(len(options))
-    if len(tokens) == 1:
+    if firstFileStr is None:
         lastOut = invalidChoice
         return
-    choiceA = verifyFileNumber(tokens[1])
-    choiceB = 0 if len(tokens) < 3 else verifyFileNumber(tokens[2])
-    if choiceA is None or choiceB is None:
+    firstChoice = verifyFileNumber(firstFileStr)
+    if firstChoice is None:
         lastOut = invalidChoice
         return
-    if choiceB == 0:
-        watched.discard(options[choiceA - 1])
-        lastOut = f"Unwatched {options[choiceA - 1]}"
+    if lastFileStr is None:
+        title = options[firstChoice - 1]
+        watched.discard(title)
+        lastOut = f"Watched {title}"
     else:
-        if choiceA > choiceB:
-            choiceA, choiceB = choiceB, choiceA
-        for i in range(choiceA, choiceB + 1):
+        lastChoice = verifyFileNumber(lastFileStr)
+        if lastChoice is None:
+            lastOut = invalidChoice
+            return
+        if firstChoice > lastChoice:
+            firstChoice, lastChoice = lastChoice, firstChoice
+        for i in range(firstChoice, lastChoice + 1):
             watched.discard(options[i - 1])
-        lastOut = f"Unwatched {choiceB - choiceA + 1} files"
+        lastOut = f"Watched {lastChoice - firstChoice + 1} files"
     dirty = True
-   
-def handleMoved(tokens):
+    
+def handleMoved(fileNumStr: Optional[str] = None, *tokens):
     global lastOut
-    if len(tokens) < 2:
+    if fileNumStr is None:
         lastOut = "Please specify a moved file"
         return
-    movedFile = verifyFileNumber(tokens[1])
+    movedFile = verifyFileNumber(fileNumStr)
     if movedFile is None:
         lastOut = f'Please select a file number from 1 to {len(options)}'
         return
     options.pop(movedFile - 1)
-    
-    
+
+# main functions
 
 def printScreen():
     os.system("cls")
@@ -585,7 +589,9 @@ def printScreen():
     print()
     print(prompt, end = '')
 
-handlers = {"quit":handleQuit,
+var = printScreen
+
+handlers: dict[str, Callable[..., None]] = {"quit":handleQuit,
             "help":handleHelp,
             "log":handleLog,
             "refresh":handleRefresh,
@@ -606,7 +612,7 @@ handlers = {"quit":handleQuit,
             "sub":handleSub,
             "watched":handleWatched,
             "unwatched":handleUnwatched,
-            "moved":handleMoved
+            "moved":handleMoved,
             }
 
 def mainLoop():
@@ -620,7 +626,7 @@ def mainLoop():
         tokens = getInput()
         if (len(tokens) == 0):
             continue
-        handlers.get(tokens[0], handleInvalid)(tokens)
+        handlers.get(tokens[0], handleInvalid)(*tokens[1:])
         
 if __name__ == "__main__":
     init()

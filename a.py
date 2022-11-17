@@ -118,6 +118,7 @@ def inquirePlaying(finishPlaying, sender, inDir):
     command = f'powershell "{pathToSocat}" {socket} \'{message}\''
     while not finishPlaying.is_set():
         proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+        assert proc.stdout
         try:
             proc.wait(5)
         except subprocess.TimeoutExpired:
@@ -189,6 +190,7 @@ def handlePlay(tokens):
    
     proc = runCommand(f'mpv "{title}"')
     proc.wait()
+    assert proc.stdout
     log = f"Playing file: {options[choice - 1]}\n{proc.stdout.read()}"
     if title not in watched:
         watched.add(options[choice - 1])
@@ -275,6 +277,7 @@ def handlePlaylist(tokens):
     
     mpvProcess = runCommand('mpv --playlist=playlist.txt --input-ipc-server=.\\pipe\\mpvsocket')
     mpvProcess.wait()
+    assert mpvProcess.stdout
     log = mpvProcess.stdout.read()
     
     finishPlaying.set()
@@ -458,7 +461,7 @@ def handleInspect(tokens):
         lastOut = f'Please enter a directory number, 1 to {len(directories)}'
         return
     try:
-        os.chdir(f'{".." if inDir else "."}\{directories[choice - 1]}')
+        os.chdir(f'{".." if inDir else "."}\\{directories[choice - 1]}')
     except:
         lastOut = "Invalid directory, somehow. Use 'dir' to update directories."
         return
@@ -503,6 +506,7 @@ def handleSub(tokens):
     print("Processing...")
     mkvmergeProcess = runCommand("mkvmerge @DoingSubtitle.json")
     mkvmergeProcess.wait()
+    assert mkvmergeProcess.stdout
     log = mkvmergeProcess.stdout.read()
     os.remove("DoingSubtitle.json")
     lastOut = "Made new file"
@@ -610,7 +614,7 @@ def mainLoop():
     while True:
         printScreen()
         if dirty:
-            with open(f'{".." if inDir else "."}\m\watched.json', 'w') as file:
+            with open(f'{".." if inDir else "."}\\m\\watched.json', 'w') as file:
                 json.dump(list(watched), file)
             dirty = False
         tokens = getInput()

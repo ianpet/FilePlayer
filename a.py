@@ -381,6 +381,7 @@ def handlemkDir(tokens):
     if inDir:
         lastOut = "Operation not supported in inspect mode"
         return
+    watchedFiles = set()
     if len(tokens) < 3:
         print("Making a new empty directory")
         name = input("Name for new directory: ")
@@ -397,7 +398,6 @@ def handlemkDir(tokens):
         print("Making a new directory from files " + str(start) + " to " + str(end))
         name = input("Name for new directory: ")
         os.system(f'mkdir "{name}"')
-        watchedFiles = set()
         completed = True
         for i in range(start, end + 1):
             fileName = options[i-1]

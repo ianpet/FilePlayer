@@ -550,7 +550,7 @@ def handleUnwatched(firstFileStr: Optional[str] = None, lastFileStr: Optional[st
     if lastFileStr is None:
         title = options[firstChoice - 1]
         watched.discard(title)
-        lastOut = f"Watched {title}"
+        lastOut = f"Unwatched {title}"
     else:
         lastChoice = verifyFileNumber(lastFileStr)
         if lastChoice is None:
@@ -560,7 +560,7 @@ def handleUnwatched(firstFileStr: Optional[str] = None, lastFileStr: Optional[st
             firstChoice, lastChoice = lastChoice, firstChoice
         for i in range(firstChoice, lastChoice + 1):
             watched.discard(options[i - 1])
-        lastOut = f"Watched {lastChoice - firstChoice + 1} files"
+        lastOut = f"Unwatched {lastChoice - firstChoice + 1} files"
     dirty = True
     
 def handleMoved(fileNumStr: Optional[str] = None, *tokens):

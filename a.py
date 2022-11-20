@@ -374,7 +374,7 @@ def handleMoveDir(fileNumStr: Optional[str] = None, secondArg: Optional[str] = N
                 break
         if completed:
             lastOut = f"Moved {str(endFileNum - startFileNum + 1)} files to {directories[dirNum - 1]}"
-    makeIndex()
+    makeIndex(True)
 
 def handlemkDir(startLocStr: Optional[str] = None, endLocString: Optional[str] = None, *tokens):
     global lastOut

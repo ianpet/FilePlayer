@@ -350,7 +350,7 @@ def handleMoveDir(fileNumStr: Optional[str] = None, secondArg: Optional[str] = N
         result = runCommand(command)
         result.wait()
         if result.returncode != 0:
-            lastOut = "Error, oops!"
+            lastOut = "Error in moving file."
         else:
             lastOut = f"Moved {options[fileNum - 1]} to {directories[dirNum - 1]}"
     else:

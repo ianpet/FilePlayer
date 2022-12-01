@@ -132,6 +132,7 @@ def inquirePlaying(finishPlaying, sender):
                 print("Error in decoding JSON response:")
                 print(outs)
                 sender.send(playingFile)
+                return
         else:
             print(proc.stdout.read().decode("utf-8"))
         finishPlaying.wait(10)

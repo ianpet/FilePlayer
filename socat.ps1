@@ -4,7 +4,7 @@ $message = $args[1]
 $npipeClient = new-object System.IO.Pipes.NamedPipeClientStream('.', $socketName, [System.IO.Pipes.PipeDirection]::InOut, [System.IO.Pipes.PipeOptions]::None, [System.Security.Principal.TokenImpersonationLevel]::Impersonation)
 
 $pipeReader = $pipeWriter = $null
-$error = $false
+$wasError = $false
 try {
     $npipeClient.Connect(2)
     $pipeReader = new-object System.IO.StreamReader($npipeClient)
@@ -12,16 +12,16 @@ try {
     $pipeWriter.AutoFlush = $true
 
     $pipeWriter.WriteLine($message)
-    ($data = $pipeReader.ReadLine())
+    Write-Output $pipeReader.ReadLine()
 }
 catch {
     "An error occurred that could not be resolved."
-    $error = $true
+    $wasError = $true
 }
 finally {
     $npipeClient.Dispose()
 }
 
-if ($error) {
+if ($wasError) {
     exit 1
 }

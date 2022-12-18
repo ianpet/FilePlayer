@@ -56,7 +56,7 @@ def makeIndex(switch=False):
     oldOptions = options.copy()
     options = []
     for line in output:
-        if line[-5:-1] in {".mkv", ".mp4"}:
+        if line[-5:-1] in {".mkv", ".mp4"} or line[-6:-1] == ".flac":
             name = line[39:-1]
             options.append(name)
     stream.close()

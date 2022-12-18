@@ -3,6 +3,7 @@ import subprocess
 import json
 import multiprocessing
 from typing import Callable, Optional
+import re
 
 
 numOpts = 0
@@ -16,6 +17,7 @@ prompt = ">"
 lastOut = ""
 watched: set[str] = set()
 dirty = False
+lastFileRegex = re.compile(r"^Playing: (.*)\.\w{3,4}$", re.MULTILINE)
 
 helpMessage = """Commands:
 play [number]                       Play file [number]
@@ -285,6 +287,10 @@ def handlePlaylist(startFileStr: Optional[str | int] = None, endFilestr: Optiona
     filePlaying = receiver.recv()
     receiver.close()
     log += f"\nLast played file: {filePlaying}"
+
+    if filePlaying == "" and (regexMatches := re.findall(lastFileRegex, log)):
+        filePlaying = regexMatches[len(regexMatches) - 1].group(1)
+
     lastOut = ""
     if filePlaying != "":
         for played in options[start-1:end]:

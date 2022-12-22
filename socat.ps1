@@ -6,7 +6,7 @@ $npipeClient = new-object System.IO.Pipes.NamedPipeClientStream('.', $socketName
 $pipeReader = $pipeWriter = $null
 $wasError = $false
 try {
-    $npipeClient.Connect(2)
+    $npipeClient.Connect(2000)
     $pipeReader = new-object System.IO.StreamReader($npipeClient)
     $pipeWriter = new-object System.IO.StreamWriter($npipeClient)
     $pipeWriter.AutoFlush = $true
@@ -15,7 +15,7 @@ try {
     Write-Output $pipeReader.ReadLine()
 }
 catch {
-    "An error occurred that could not be resolved."
+    "An error occurred in the pipe read that could not be resolved."
     $wasError = $true
 }
 finally {

@@ -4,7 +4,7 @@ import json
 import multiprocessing
 from typing import Callable, Optional
 import re
-
+import time
 
 numOpts = 0
 options: list[str] = []
@@ -17,7 +17,7 @@ prompt = ">"
 lastOut = ""
 watched: set[str] = set()
 dirty = False
-lastFileRegex = re.compile(r"^Playing: (.*)\.\w{3,4}$", re.MULTILINE)
+lastFileRegex = re.compile(r"^Playing: (.*)$", re.MULTILINE)
 
 helpMessage = """Commands:
 play [number]                       Play file [number]
@@ -124,6 +124,7 @@ def inquirePlaying(finishPlaying, sender):
         try:
             proc.wait(5)
         except subprocess.TimeoutExpired:
+            print("Playlist subprocess timed out")
             sender.send(playingFile)
             return
         if proc.returncode == 0:
@@ -136,6 +137,7 @@ def inquirePlaying(finishPlaying, sender):
                 sender.send(playingFile)
                 return
         else:
+            print(f"Playlist subprocess failed, err={proc.returncode}")
             print(proc.stdout.read().decode("utf-8"))
         finishPlaying.wait(10)
     sender.send(playingFile)
@@ -277,7 +279,7 @@ def handlePlaylist(startFileStr: Optional[str | int] = None, endFilestr: Optiona
     sender, receiver = multiprocessing.Pipe()
     inquireProcess = multiprocessing.Process(target=inquirePlaying, args=(finishPlaying, sender))
     inquireProcess.start()
-    
+
     mpvProcess = runCommand('mpv --playlist=playlist.txt --input-ipc-server=.\\pipe\\mpvsocket')
     mpvProcess.wait()
     assert mpvProcess.stdout
@@ -286,10 +288,12 @@ def handlePlaylist(startFileStr: Optional[str | int] = None, endFilestr: Optiona
     finishPlaying.set()
     filePlaying = receiver.recv()
     receiver.close()
-    log += f"\nLast played file: {filePlaying}"
 
     if filePlaying == "" and (regexMatches := re.findall(lastFileRegex, log)):
-        filePlaying = regexMatches[len(regexMatches) - 1].group(1)
+        filePlaying = regexMatches[len(regexMatches) - 1]
+
+    log += f"\nLast played file: {filePlaying}"
+
 
     lastOut = ""
     if filePlaying != "":

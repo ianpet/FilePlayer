@@ -18,6 +18,9 @@ lastOut = ""
 watched: set[str] = set()
 dirty = False
 lastFileRegex = re.compile(r"^Playing: (.*)$", re.MULTILINE)
+filter = ""
+max = 0
+min = 0
 
 helpMessage = """Commands:
 play [number]                       Play file [number]
@@ -38,6 +41,13 @@ watched [start] [end]               Mark [start] through [end] as watched
 unwatched [number]                  Mark [number] as unwatched
 unwatched [start] [end]             Mark [start] through [end] as unwatched
 moved [number]                      Mark [number] as having moved directories
+filter [word]                       Display titles containing [word], case-insensitive
+filter                              Reset the filter, displaying all files
+max [number]                        Show files up to [number]
+max                                 Unlimit maximum number
+range                               Display all files
+range [min]                         Display set number of files from [min]
+range [min] [max]                   Display files from [min] to [max]
 config                              Open the mpv config file
 log                                 Print the log of the last play
 refresh                             Refresh the index
@@ -66,11 +76,17 @@ def makeIndex(switch=False):
             dirty = True
        
 def printIndex():
-    
+    max_length = len(str(len(options)))
     for (i, title) in enumerate(options):
-        buffer = "  " if (i+1) < 10 else " "
+        number = i + 1
+        if number < min:
+            continue
+        if max and number > max:
+            return
+        if filter != "" and filter not in title.lower():
+            continue
+        buffer = " " * (max_length - len(str(number)) + 1)
         unwatched = " " if title in watched else "*"
-        number = str(i + 1)
         entry = f"{unwatched}{buffer}{number}: {title}"
         print(entry)
         
@@ -170,6 +186,7 @@ def handleRefresh(*tokens):
     global lastOut
     os.system("mode con: cols=120 lines=60")
     makeIndex()
+    lastOut = ""
     
 def handleHelp(*tokens):
     global lastOut
@@ -585,6 +602,59 @@ def handleMoved(fileNumStr: Optional[str] = None, *tokens):
         return
     options.pop(movedFile - 1)
 
+def handleFilter(filterStr: Optional[str] = None, *tokens):
+    global filter
+    global lastOut
+    if filterStr:
+        filter = filterStr
+        lastOut = f"Filtering files by \"{filterStr}\""
+    else:
+        filter = ""
+        lastOut = "No filter applied"
+    return
+    
+def handleMax(maxStr: Optional[str] = None, *tokens):
+    global lastOut
+    global max
+    if maxStr is None:
+        max = 0
+        lastOut = "Viewing all files"
+        return
+    try: # can select 0 for all
+        maxInt = int(maxStr)
+    except (ValueError, TypeError):
+        lastOut = f"Please provide a number"
+        return
+    max = maxInt
+    lastOut = f"Showing files up to {maxStr}"
+    
+def handleRange(minStr: Optional[str] = None, maxStr: Optional[str] = None, *tokens):
+    global lastOut
+    global min
+    global max
+    if minStr is None:
+        min = 0
+        max = 0
+        lastOut = "Viewing all files"
+        return
+    minFile = verifyFileNumber(minStr)
+    if minFile is None:
+        lastOut = f"Please select a minimum number from 1 to {len(options)}"
+        return
+    if maxStr is None:
+        min = minFile
+        max = minFile + 50
+        lastOut = f"Viewing files from {minFile}"
+        return
+    maxFile = verifyFileNumber(maxStr)
+    if maxFile is None:
+        lastOut = f"Please select a maximum number from 1 to {len(options)}"
+        return
+    min = minFile
+    max = maxFile
+    lastOut = f"Viewing files from {min} to {max}"
+    
+    
 # main functions
 
 def printScreen():
@@ -624,6 +694,9 @@ handlers: dict[str, Callable[..., None]] = {"quit":handleQuit,
             "watched":handleWatched,
             "unwatched":handleUnwatched,
             "moved":handleMoved,
+            "filter":handleFilter,
+            "max":handleMax,
+            "range":handleRange
             }
 
 def mainLoop():

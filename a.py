@@ -5,10 +5,12 @@ import multiprocessing
 from typing import Callable, Optional
 import re
 import time
+import keyboard
 
 numOpts = 0
 options: list[str] = []
 directories: list[str] = []
+series: set[str] = set()
 inDir = False
 dirNumber = 0
 log = "No file played"
@@ -18,9 +20,11 @@ lastOut = ""
 watched: set[str] = set()
 dirty = False
 lastFileRegex = re.compile(r"^Playing: (.*)$", re.MULTILINE)
+seriesEpisodeRegex = re.compile(r"^(?:\[.*\] )?(.*) - (\d+).*\.mkv")
 filter = ""
 max = 0
 min = 0
+
 
 helpMessage = """Commands:
 play [number]                       Play file [number]
@@ -65,9 +69,13 @@ def makeIndex(switch=False):
     global options
     oldOptions = options.copy()
     options = []
+    series.clear()
     for line in output:
         if line[-5:-1] in {".mkv", ".mp4"} or line[-6:-1] == ".flac":
             name = line[39:-1]
+            match = re.match(seriesEpisodeRegex, name)
+            if match:
+                series.add(match.groups()[0])
             options.append(name)
     stream.close()
     if not (inDir or switch):
@@ -232,7 +240,7 @@ def handleDelete(fileNumStr: Optional[str] = None, *tokens):
     if choice is None:
         lastOut = invalidChoice
         return
-    prompt = f'Are you sure you want to delete {"unwatched" if options[choice - 1] not in watched else ""} "{options[choice-1]}"?\nY to confirm: '
+    prompt = f'Are you sure you want to delete {"unwatched " if options[choice - 1] not in watched else ""}"{options[choice-1]}"?\nY to confirm: '
     response = input(prompt)
     if response.lower() != 'y':
         lastOut = "Deletion canceled"
@@ -654,7 +662,26 @@ def handleRange(minStr: Optional[str] = None, maxStr: Optional[str] = None, *tok
     max = maxFile
     lastOut = f"Viewing files from {min} to {max}"
     
+# won't work as is - save for complete rewrite
+# def scrollUp():
+    # curMin = min if min != 0 else len(options) - 50
+    # newMin = 1 if curMin <= 50 else curMin - 50
+    # handleRange(newMin)
     
+    
+# def scrollDown():
+    # curMin = min if min != 0 else len(options) - 50
+    # newMin = curMin + 50
+    # handleRange(newMin)
+    
+# keyboard.on_press_key(",", lambda _: scrollUp())
+# keyboard.on_press_key(".", lambda _: scrollDown())
+
+def handleSeries(*tokens):
+    global lastOut
+    lastOut = "\n".join(f"{i+1}: {sName}" for i, sName in enumerate(sorted(list(series))))
+ 
+ 
 # main functions
 
 def printScreen():
@@ -696,7 +723,8 @@ handlers: dict[str, Callable[..., None]] = {"quit":handleQuit,
             "moved":handleMoved,
             "filter":handleFilter,
             "max":handleMax,
-            "range":handleRange
+            "range":handleRange,
+            "series":handleSeries
             }
 
 def mainLoop():

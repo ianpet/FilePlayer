@@ -4,11 +4,15 @@ import json
 import multiprocessing
 from typing import Callable, Optional
 import re
+import datetime
 import time
 import keyboard
 
 numOpts = 0
 options: list[str] = []
+alphaOptions: list[str] = []
+recentOptions: list[str] = []
+doRecent = False
 directories: list[str] = []
 series: set[str] = set()
 inDir = False
@@ -67,8 +71,11 @@ def makeIndex(switch=False):
     stream = os.popen('dir\n')
     output = stream.readlines()
     global options
-    oldOptions = options.copy()
-    options = []
+    global alphaOptions
+    global recentOptions
+    oldOptions = alphaOptions.copy()
+    alphaOptions = []
+    recentOptions = []
     series.clear()
     for line in output:
         if line[-5:-1] in {".mkv", ".mp4"} or line[-6:-1] == ".flac":
@@ -76,16 +83,22 @@ def makeIndex(switch=False):
             match = re.match(seriesEpisodeRegex, name)
             if match:
                 series.add(match.groups()[0])
-            options.append(name)
+            alphaOptions.append(name)
+            recentOptions.append((name, datetime.datetime.strptime(line[:20], "%m/%d/%Y %H:%M %p")))
     stream.close()
+    recentOptions = [recentOpt[0] for recentOpt in sorted(recentOptions, key = lambda x: x[1])]
+    
+    options = recentOptions if doRecent else alphaOptions
+    
     if not (inDir or switch):
-        for title in (x for x in oldOptions if x not in options):
+        for title in (x for x in oldOptions if x not in alphaOptions):
             watched.discard(title)
             dirty = True
        
 def printIndex():
-    max_length = len(str(len(options)))
-    for (i, title) in enumerate(options):
+    index = options
+    max_length = len(str(len(index)))
+    for (i, title) in enumerate(index):
         number = i + 1
         if number < min:
             continue
@@ -102,7 +115,7 @@ def init():
     global lastOut
     global watched
     os.system("cls")
-    os.system("mode con: cols=120 lines=60")
+    os.system("mode con: cols=120 lines=70")
     makeIndex()
     handleDir()
     try:
@@ -680,6 +693,14 @@ def handleRange(minStr: Optional[str] = None, maxStr: Optional[str] = None, *tok
 def handleSeries(*tokens):
     global lastOut
     lastOut = "\n".join(f"{i+1}: {sName}" for i, sName in enumerate(sorted(list(series))))
+
+def handleRecent(*tokens):
+    global doRecent
+    global lastOut
+    global options
+    doRecent = not doRecent
+    options = recentOptions if doRecent else alphaOptions
+    lastOut = f"Sorting by {'alphabetical' if not doRecent else 'chronological'} "
  
  
 # main functions
@@ -724,7 +745,8 @@ handlers: dict[str, Callable[..., None]] = {"quit":handleQuit,
             "filter":handleFilter,
             "max":handleMax,
             "range":handleRange,
-            "series":handleSeries
+            "series":handleSeries,
+            "recent":handleRecent,
             }
 
 def mainLoop():

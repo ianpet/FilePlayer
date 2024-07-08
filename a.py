@@ -84,7 +84,7 @@ def makeIndex(switch=False):
             if match:
                 series.add(match.groups()[0])
             alphaOptions.append(name)
-            recentOptions.append((name, datetime.datetime.strptime(line[:20], "%m/%d/%Y %H:%M %p")))
+            recentOptions.append((name, datetime.datetime.strptime(line[:20], "%m/%d/%Y %I:%M %p")))
     stream.close()
     recentOptions = [recentOpt[0] for recentOpt in sorted(recentOptions, key = lambda x: x[1])]
     

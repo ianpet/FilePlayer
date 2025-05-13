@@ -6,7 +6,7 @@ from typing import Callable, Optional
 import re
 import datetime
 import time
-import keyboard
+# import keyboard
 
 numOpts = 0
 options: list[str] = []
@@ -156,7 +156,11 @@ def inquirePlaying(finishPlaying, sender):
     message = '{ "command": [\\"get_property\\", \\"path\\"] }'
     command = f'powershell "{pathToSocat}" {socket} \'{message}\''
     while not finishPlaying.is_set():
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+        try:
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+        except Exception: # command not found
+            sender.send(playingFile)
+            return
         assert proc.stdout
         try:
             proc.wait(5)
@@ -176,6 +180,8 @@ def inquirePlaying(finishPlaying, sender):
         else:
             print(f"Playlist subprocess failed, err={proc.returncode}")
             print(proc.stdout.read().decode("utf-8"))
+            sender.send(playingFile)
+            return
         finishPlaying.wait(10)
     sender.send(playingFile)
 
@@ -313,20 +319,20 @@ def handlePlaylist(startFileStr: Optional[str | int] = None, endFilestr: Optiona
     print("Press q during playback to quit, < and > to change file...")
     
     # hell    
-    finishPlaying = multiprocessing.Event()
-    sender, receiver = multiprocessing.Pipe()
-    inquireProcess = multiprocessing.Process(target=inquirePlaying, args=(finishPlaying, sender))
-    inquireProcess.start()
+    # finishPlaying = multiprocessing.Event()
+    # sender, receiver = multiprocessing.Pipe()
+    # inquireProcess = multiprocessing.Process(target=inquirePlaying, args=(finishPlaying, sender))
+    # inquireProcess.start()
 
-    mpvProcess = runCommand('mpv --playlist=playlist.txt --input-ipc-server=.\\pipe\\mpvsocket')
+    mpvProcess = runCommand('mpv --playlist=playlist.txt') # --input-ipc-server=.\\pipe\\mpvsocket')
     mpvProcess.wait()
     assert mpvProcess.stdout
     log = mpvProcess.stdout.read()
     
-    finishPlaying.set()
-    filePlaying = receiver.recv()
-    receiver.close()
-
+    # finishPlaying.set()
+    # filePlaying = receiver.recv()
+    # receiver.close()
+    filePlaying = ""
     if filePlaying == "" and (regexMatches := re.findall(lastFileRegex, log)):
         filePlaying = regexMatches[len(regexMatches) - 1]
 
